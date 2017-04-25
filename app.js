@@ -1,62 +1,101 @@
-var INSTA_BASE_URL = 'https://api.instagram.com/v1/tags/coffee/media/recent?access_token=ACCESS-TOKEN&callback=callbackFunction';
-var RAV_BASE_URL = '';
+// Client ID and API key from the Developer Console
+var CLIENT_ID = '374539335573-hblr84k4ls5l20cb37ita15tpjfqdk8f.apps.googleusercontent.com';
 
-function getDataFromInsta(searchTerm, callback) {
-    var feed = new Instafeed({
-        clientId: 'YOUR_CLIENT_ID',
-        get: 'tagged',
-        tagName: searchTerm,
-        sortBy: 'most-recent',
-        target: 'instafeed',
-        resolution: 'standard_resolution',
-        limit: 15,
-        template: '<div class=""><a href="{{link}}"><img src="{{image}}" class="instaimage"></a></div>',
-        success: callback
+// Array of API discovery doc URLs for APIs used by the quickstart
+var DISCOVERY_DOCS = ["https://www.googleapis.com/discovery/v1/apis/drive/v3/rest"];
+
+// Authorization scopes required by the API; multiple scopes can be
+// included, separated by spaces.
+var SCOPES = 'https://www.googleapis.com/auth/drive.metadata.readonly';
+
+var authorizeButton = document.getElementById('authorize-button');
+var signoutButton = document.getElementById('signout-button');
+
+/**
+ *  On load, called to load the auth2 library and API client library.
+ */
+function handleClientLoad() {
+    gapi.load('client:auth2', initClient);
+}
+
+/**
+ *  Initializes the API client library and sets up sign-in state
+ *  listeners.
+ */
+function initClient() {
+    gapi.client.init({
+        discoveryDocs: DISCOVERY_DOCS,
+        clientId: CLIENT_ID,
+        scope: SCOPES
+    }).then(function() {
+        // Listen for sign-in state changes.
+        gapi.auth2.getAuthInstance().isSignedIn.listen(updateSigninStatus);
+
+        // Handle the initial sign-in state.
+        updateSigninStatus(gapi.auth2.getAuthInstance().isSignedIn.get());
+        authorizeButton.onclick = handleAuthClick;
+        signoutButton.onclick = handleSignoutClick;
     });
-    feed.run();
-    $.ajax(settings);
 }
 
-
-
-function getDataFromRav(searchTerm, callback) {
-    var settings = {
-        url: RAV_BASE_URL,
-        data: {
-            part: 'snippet',
-            key: 'AIzaSyBcNX1xVrmVGTDyHb_ZDL9qeUV24VG6NLU',
-            q: searchTerm,
-            maxResults: 50,
-            //order: title,
-            //type: video,
-        },
-        dataType: 'json',
-        type: 'GET',
-        success: callback
-    };
-    $.ajax(settings);
-}
-
-
-function displayYouTubeSearchData(data) {
-    var resultElement = '';
-    if (data.items) {
-        data.items.forEach(function(item) {
-            resultElement += '<p>' + item.snippet.title + '</p><a href="https://www.youtube.com/watch?v=' + item.id.videoId + '"><img src="' + item.snippet.thumbnails.medium.url + '"></a>';
-        });
+/**
+ *  Called when the signed in status changes, to update the UI
+ *  appropriately. After a sign-in, the API is called.
+ */
+function updateSigninStatus(isSignedIn) {
+    if (isSignedIn) {
+        authorizeButton.style.display = 'none';
+        signoutButton.style.display = 'block';
+        listFiles();
     } else {
-        resultElement += '<p>No results</p>';
+        authorizeButton.style.display = 'block';
+        signoutButton.style.display = 'none';
     }
-
-    $('.js-search-results').html(resultElement);
 }
 
-function watchSubmit() {
-    $('.js-search-form').submit(function(event) {
-        event.preventDefault();
-        var query = $(this).find('.js-query').val();
-        getDataFromApi(query, displayYouTubeSearchData);
+/**
+ *  Sign in the user upon button click.
+ */
+function handleAuthClick(event) {
+    gapi.auth2.getAuthInstance().signIn();
+}
+
+/**
+ *  Sign out the user upon button click.
+ */
+function handleSignoutClick(event) {
+    gapi.auth2.getAuthInstance().signOut();
+}
+
+/**
+ * Append a pre element to the body containing the given message
+ * as its text node. Used to display the results of the API call.
+ *
+ * @param {string} message Text to be placed in pre element.
+ */
+function appendPre(message) {
+    var pre = document.getElementById('content');
+    var textContent = document.createTextNode(message + '\n');
+    pre.appendChild(textContent);
+}
+
+/**
+ * Print files.
+ */
+function listFiles() {
+    gapi.client.drive.files.list({
+        'pageSize': 10,
+        'fields': "nextPageToken, files(id, name)"
+    }).then(function(response) {
+        appendPre('Files:');
+        var files = response.result.files;
+        if (files && files.length > 0) {
+            for (var i = 0; i < files.length; i++) {
+                var file = files[i];
+                appendPre(file.name + ' (' + file.id + ')');
+            }
+        } else {
+            appendPre('No files found.');
+        }
     });
 }
-
-$(function() { watchSubmit(); });
